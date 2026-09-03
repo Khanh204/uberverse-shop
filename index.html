@@ -53,13 +53,6 @@
             background: #475569;
             border-radius: 4px;
         }
-        .pulse-badge {
-            animation: pulse-glow 2s infinite;
-        }
-        @keyframes pulse-glow {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.85; transform: scale(1.03); }
-        }
     </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -82,6 +75,10 @@
 
             <!-- Header Quick Actions -->
             <div class="flex items-center space-x-3">
+                <span id="connectionBadge" class="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-slate-500" id="connectionDot"></span>
+                    <span id="connectionText">Đang kết nối...</span>
+                </span>
                 <button id="soundToggleBtn" onclick="toggleSound()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition">
                     <i id="soundIcon" class="fa-solid fa-volume-high text-indigo-400"></i>
                     <span id="soundText">Âm thanh: Bật</span>
@@ -99,7 +96,7 @@
 
         <!-- Stat Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+            <div onclick="setFilter('ALL')" class="cursor-pointer bg-slate-900 hover:border-slate-700 border border-slate-800 rounded-2xl p-4 flex items-center justify-between transition">
                 <div>
                     <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Tổng Tài Khoản</p>
                     <h3 id="statTotal" class="text-2xl font-bold text-white mt-1">0</h3>
@@ -109,7 +106,7 @@
                 </div>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+            <div onclick="setFilter('BANNED')" class="cursor-pointer bg-slate-900 hover:border-slate-700 border border-slate-800 rounded-2xl p-4 flex items-center justify-between transition">
                 <div>
                     <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đang Bị Ban</p>
                     <h3 id="statBanned" class="text-2xl font-bold text-rose-400 mt-1">0</h3>
@@ -119,7 +116,7 @@
                 </div>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+            <div onclick="setFilter('SOON')" class="cursor-pointer bg-slate-900 hover:border-slate-700 border border-slate-800 rounded-2xl p-4 flex items-center justify-between transition">
                 <div>
                     <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sắp Mở Ban (&lt;24h)</p>
                     <h3 id="statExpiringSoon" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
@@ -129,7 +126,7 @@
                 </div>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+            <div onclick="setFilter('UNBANNED')" class="cursor-pointer bg-slate-900 hover:border-slate-700 border border-slate-800 rounded-2xl p-4 flex items-center justify-between transition">
                 <div>
                     <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đã Mở Ban</p>
                     <h3 id="statUnbanned" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
@@ -140,7 +137,7 @@
             </div>
         </div>
 
-        <!-- Add Accounts Panel / Accordion -->
+        <!-- Add Accounts Panel -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
             <div class="bg-slate-800/60 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                 <div class="flex items-center space-x-2">
@@ -162,7 +159,12 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Thời gian bắt đầu ban:</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-medium text-slate-300">Thời gian bắt đầu ban:</label>
+                            <button type="button" onclick="setCurrentTimeAsStart()" class="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition">
+                                <i class="fa-solid fa-rotate-right"></i> Lấy giờ hiện tại
+                            </button>
+                        </div>
                         <input type="datetime-local" id="banStartInput" 
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                     </div>
@@ -174,22 +176,22 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Hoặc chọn thời hạn Ban nhanh:</label>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Hoặc chọn thời hạn Ban nhanh (Tự tính toán):</label>
                         <div class="grid grid-cols-4 gap-1.5">
-                            <button type="button" onclick="setBanQuickHours(24)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">1 Ngày</button>
-                            <button type="button" onclick="setBanQuickHours(72)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">3 Ngày</button>
-                            <button type="button" onclick="setBanQuickHours(168)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">7 Ngày</button>
-                            <button type="button" onclick="setBanQuickHours(720)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">30 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(24)" class="px-2 py-2 bg-slate-800 hover:bg-indigo-600/30 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-200 text-xs rounded-lg border border-slate-700 transition font-medium">+1 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(72)" class="px-2 py-2 bg-slate-800 hover:bg-indigo-600/30 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-200 text-xs rounded-lg border border-slate-700 transition font-medium">+3 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(168)" class="px-2 py-2 bg-slate-800 hover:bg-indigo-600/30 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-200 text-xs rounded-lg border border-slate-700 transition font-medium">+7 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(720)" class="px-2 py-2 bg-slate-800 hover:bg-indigo-600/30 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-200 text-xs rounded-lg border border-slate-700 transition font-medium">+30 Ngày</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between pt-2">
-                    <div class="flex items-center space-x-2 w-1/2">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <div class="flex items-center space-x-2 w-full sm:w-1/2">
                         <input type="text" id="noteInput" placeholder="Ghi chú thêm (Ví dụ: Lỗi Spam, Lỗi Game...)" 
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
                     </div>
-                    <button onclick="submitBulkAccounts()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition">
+                    <button onclick="submitBulkAccounts()" class="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2 transition">
                         <i class="fa-solid fa-cloud-arrow-up"></i>
                         <span>Lưu Danh Sách Về SQLite</span>
                     </button>
@@ -220,7 +222,12 @@
                 </div>
 
                 <!-- Batch Actions -->
-                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                <div class="flex flex-wrap items-center space-x-2 w-full sm:w-auto justify-end gap-y-2">
+                    <button onclick="copySelectedRawBatch()" class="px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 text-xs font-medium rounded-xl transition flex items-center space-x-1.5" title="Copy Raw các dòng đang được tích chọn">
+                        <i class="fa-solid fa-check-double"></i>
+                        <span>Copy Chọn</span>
+                    </button>
+
                     <button onclick="copyUnbannedRawBatch()" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-medium rounded-xl transition flex items-center space-x-1.5">
                         <i class="fa-solid fa-copy"></i>
                         <span>Copy Hết Acc Mở Ban</span>
@@ -260,176 +267,197 @@
             </div>
 
             <!-- Empty State -->
-            <div id="emptyState" class="hidden p-12 text-center">
+            <div id="emptyState" class="p-12 text-center">
                 <div class="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
                     <i class="fa-solid fa-folder-open"></i>
                 </div>
                 <p class="text-slate-400 font-medium">Chưa có dữ liệu tài khoản nào</p>
-                <p class="text-slate-600 text-xs mt-1">Hãy dán tài khoản vào khung phía trên và nhấn "Lưu Danh Sách"</p>
+                <p class="text-slate-600 text-xs mt-1">Hãy dán tài khoản vào khung phía trên và nhấn "Lưu Danh Sách Về SQLite"</p>
             </div>
         </div>
     </main>
 
-    <!-- Sound Effects Element -->
+    <!-- Edit Account Modal -->
+    <div id="editModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-indigo-400"></i>
+                    Cập Nhật Tài Khoản
+                </h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-base">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <input type="hidden" id="editAccountId">
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Email:</label>
+                <input type="text" id="editAccountEmail" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-400 font-mono cursor-not-allowed">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Thời gian Mở Ban:</label>
+                <input type="datetime-local" id="editBanEndInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Ghi chú:</label>
+                <input type="text" id="editNoteInput" placeholder="Nhập ghi chú..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button onclick="closeEditModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition">
+                    Hủy
+                </button>
+                <button onclick="saveAccountEdit()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-xl shadow-md shadow-indigo-600/20 transition">
+                    Lưu Cập Nhật
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Notification Element -->
     <audio id="unbanSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <script>
-        // Global States
         let accountsList = [];
         let filteredList = [];
         let soundEnabled = true;
+        let isOnlineServer = false;
 
-        // Auto initialization
-        window.addEventListener('DOMContentLoaded', () => {
-            // Set default ban start to current date time
-            const now = new Date();
-            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            document.getElementById('banStartInput').value = now.toISOString().slice(0, 16);
+        // Helper: Format Date to local HTML datetime-local string (YYYY-MM-DDTHH:mm)
+        function formatDateTimeLocal(date) {
+            const d = new Date(date);
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
 
-            fetchAccounts();
+        // Helper: Parse Raw line in browser (fallback mode)
+        function parseRawLineJS(line) {
+            if (!line || !line.trim()) return null;
+            const cleanLine = line.trim();
+            const parts = cleanLine.split('|');
+            return {
+                email: parts[0] ? parts[0].trim() : 'N/A',
+                password: parts[1] ? parts[1].trim() : '',
+                token: parts[2] ? parts[2].trim() : '',
+                uuid: parts[3] ? parts[3].trim() : '',
+                rawData: cleanLine
+            };
+        }
 
-            // Refresh table and countdowns every 1 second
-            setInterval(updateCountdowns, 1000);
-            // Fetch fresh data from backend every 15 seconds
-            setInterval(fetchAccounts, 15000);
-        });
+        function setCurrentTimeAsStart() {
+            document.getElementById('banStartInput').value = formatDateTimeLocal(new Date());
+        }
 
-        // Toggle Sound Alert
+        function setBanQuickHours(hours) {
+            let startInput = document.getElementById('banStartInput');
+            if (!startInput.value) {
+                startInput.value = formatDateTimeLocal(new Date());
+            }
+            const startDate = new Date(startInput.value);
+            const endDate = new Date(startDate.getTime() + hours * 3600 * 1000);
+            document.getElementById('banEndInput').value = formatDateTimeLocal(endDate);
+            
+            showToast(`Đã tính thời gian mở ban: +${hours / 24} ngày!`, "success");
+        }
+
         function toggleSound() {
             soundEnabled = !soundEnabled;
-            const soundIcon = document.getElementById('soundIcon');
-            const soundText = document.getElementById('soundText');
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
             if (soundEnabled) {
-                soundIcon.className = "fa-solid fa-volume-high text-indigo-400";
-                soundText.innerText = "Âm thanh: Bật";
+                icon.className = "fa-solid fa-volume-high text-indigo-400";
+                text.innerText = "Âm thanh: Bật";
+                showToast("Đã bật âm thanh thông báo", "info");
             } else {
-                soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
-                soundText.innerText = "Âm thanh: Tắt";
+                icon.className = "fa-solid fa-volume-xmark text-slate-500";
+                text.innerText = "Âm thanh: Tắt";
+                showToast("Đã tắt âm thanh thông báo", "warning");
             }
         }
 
-        // Request Browser Notification Permission
         function requestNotificationPermission() {
             if ("Notification" in window) {
                 Notification.requestPermission().then(permission => {
                     if (permission === "granted") {
-                        showToast("Đã cấp quyền thông báo trình duyệt thành công!", "success");
+                        showToast("Đã bật thông báo trình duyệt!", "success");
                     } else {
-                        showToast("Quyền thông báo bị từ chối hoặc bị chặn.", "warning");
+                        showToast("Thông báo bị từ chối hoặc chặn!", "warning");
                     }
                 });
             } else {
-                showToast("Trình duyệt không hỗ trợ Web Notification.", "error");
+                showToast("Trình duyệt không hỗ trợ thông báo", "error");
             }
         }
 
-        // Quick set ban hours helper
-        function setBanQuickHours(hours) {
-            const startVal = document.getElementById('banStartInput').value;
-            const startDate = startVal ? new Date(startVal) : new Date();
-            const endDate = new Date(startDate.getTime() + hours * 3600 * 1000);
-            
-            endDate.setMinutes(endDate.getMinutes() - endDate.getTimezoneOffset());
-            document.getElementById('banEndInput').value = endDate.toISOString().slice(0, 16);
-        }
+        // Initial setup on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setCurrentTimeAsStart();
+            fetchAccounts();
 
-        // Fetch accounts from SQLite backend
+            setInterval(updateCountdowns, 1000);
+            setInterval(fetchAccounts, 10000);
+        });
+
         async function fetchAccounts() {
             try {
                 const res = await fetch('/api/accounts');
-                if (!res.ok) throw new Error('Không thể tải danh sách tài khoản');
+                if (!res.ok) throw new Error('Server error');
                 accountsList = await res.json();
-                filterAccounts();
-                checkAndNotifyUnbanned();
+                isOnlineServer = true;
+                updateConnectionStatus(true);
             } catch (err) {
-                console.error("Fetch Error:", err);
+                isOnlineServer = false;
+                updateConnectionStatus(false);
+                const localData = localStorage.getItem('ban_accounts_offline');
+                accountsList = localData ? JSON.parse(localData) : [];
+            }
+            filterAccounts();
+            checkAndNotifyUnbanned();
+        }
+
+        function updateConnectionStatus(online) {
+            const dot = document.getElementById('connectionDot');
+            const text = document.getElementById('connectionText');
+            if (!dot || !text) return;
+            if (online) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping";
+                text.innerText = "SQLite Máy Chủ";
+                text.className = "text-emerald-400";
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-400";
+                text.innerText = "Chế độ Local";
+                text.className = "text-amber-400";
             }
         }
 
-        // Submit Bulk Accounts
-        async function submitBulkAccounts() {
-            const rawLines = document.getElementById('bulkRawData').value;
-            const banStart = document.getElementById('banStartInput').value;
-            const banEnd = document.getElementById('banEndInput').value;
-            const note = document.getElementById('noteInput').value;
-
-            if (!rawLines.trim()) {
-                showToast("Vui lòng dán danh sách tài khoản!", "error");
-                return;
-            }
-
-            if (!banEnd) {
-                showToast("Vui lòng chọn thời gian mở ban!", "error");
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/accounts/bulk', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rawLines, banStart, banEnd, note })
-                });
-
-                const data = await res.json();
-                if (data.success) {
-                    showToast(data.message, "success");
-                    document.getElementById('bulkRawData').value = '';
-                    document.getElementById('noteInput').value = '';
-                    fetchAccounts();
-                } else {
-                    showToast(data.error || "Có lỗi xảy ra", "error");
-                }
-            } catch (err) {
-                showToast("Không thể kết nối đến máy chủ!", "error");
-            }
+        function setFilter(status) {
+            document.getElementById('statusFilter').value = status;
+            filterAccounts();
         }
 
-        // Filter & Search Logic
         function filterAccounts() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const statusVal = document.getElementById('statusFilter').value;
             const now = new Date();
 
-            filteredList = accountsList.filter(acc => {
-                const banEnd = new Date(acc.banEnd);
-                const diffMs = banEnd - now;
-                const isUnbanned = diffMs <= 0;
-                const isExpiringSoon = diffMs > 0 && diffMs <= 24 * 3600 * 1000;
-
-                // Match Search
-                const matchSearch = (acc.email || '').toLowerCase().includes(query) ||
-                                    (acc.rawData || '').toLowerCase().includes(query) ||
-                                    (acc.token || '').toLowerCase().includes(query) ||
-                                    (acc.uuid || '').toLowerCase().includes(query);
-
-                // Match Status
-                let matchStatus = true;
-                if (status === 'BANNED') matchStatus = !isUnbanned;
-                else if (status === 'SOON') matchStatus = isExpiringSoon;
-                else if (status === 'UNBANNED') matchStatus = isUnbanned;
-
-                return matchSearch && matchStatus;
-            });
-
-            updateStats();
-            renderTable();
-        }
-
-        // Calculate Statistics
-        function updateStats() {
-            const now = new Date();
             let total = accountsList.length;
             let banned = 0;
             let expiringSoon = 0;
             let unbanned = 0;
 
-            accountsList.forEach(acc => {
-                const diffMs = new Date(acc.banEnd) - now;
-                if (diffMs <= 0) {
+            accountsList.forEach(a => {
+                const end = new Date(a.banEnd);
+                const diffHours = (end - now) / (1000 * 60 * 60);
+
+                if (now >= end) {
                     unbanned++;
                 } else {
                     banned++;
-                    if (diffMs <= 24 * 3600 * 1000) {
+                    if (diffHours <= 24 && diffHours > 0) {
                         expiringSoon++;
                     }
                 }
@@ -439,153 +467,330 @@
             document.getElementById('statBanned').innerText = banned;
             document.getElementById('statExpiringSoon').innerText = expiringSoon;
             document.getElementById('statUnbanned').innerText = unbanned;
+
+            filteredList = accountsList.filter(a => {
+                const end = new Date(a.banEnd);
+                const diffHours = (end - now) / (1000 * 60 * 60);
+                const matchesSearch = !searchVal || 
+                    a.email.toLowerCase().includes(searchVal) || 
+                    a.token.toLowerCase().includes(searchVal) || 
+                    a.uuid.toLowerCase().includes(searchVal) ||
+                    (a.note && a.note.toLowerCase().includes(searchVal));
+
+                let matchesStatus = true;
+                if (statusVal === 'BANNED') matchesStatus = (now < end);
+                else if (statusVal === 'SOON') matchesStatus = (now < end && diffHours <= 24);
+                else if (statusVal === 'UNBANNED') matchesStatus = (now >= end);
+
+                return matchesSearch && matchesStatus;
+            });
+
+            renderAccounts(filteredList);
         }
 
-        // Render Table Rows
-        function renderTable() {
+        function renderAccounts(list) {
             const tbody = document.getElementById('accountTableBody');
             const emptyState = document.getElementById('emptyState');
 
-            tbody.innerHTML = '';
-
-            if (filteredList.length === 0) {
+            if (!list || list.length === 0) {
+                tbody.innerHTML = '';
                 emptyState.classList.remove('hidden');
                 return;
-            } else {
-                emptyState.classList.add('hidden');
             }
 
+            emptyState.classList.add('hidden');
             const now = new Date();
 
-            filteredList.forEach(acc => {
-                const banEndDate = new Date(acc.banEnd);
-                const isUnbanned = now >= banEndDate;
-
-                const tr = document.createElement('tr');
-                tr.className = `hover:bg-slate-800/40 transition border-b border-slate-800/40 ${isUnbanned ? 'bg-emerald-950/10' : ''}`;
-
-                tr.innerHTML = `
-                    <td class="p-3 text-center">
-                        <input type="checkbox" value="${acc.id}" class="acc-checkbox rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0">
-                    </td>
-                    <td class="p-3">
-                        <div class="font-semibold text-slate-100 flex items-center space-x-1.5">
-                            <span class="truncate max-w-[180px] inline-block" title="${acc.email}">${acc.email}</span>
-                            <button onclick="copyToClipboard('${acc.email}')" title="Copy Email" class="text-slate-500 hover:text-indigo-400"><i class="fa-regular fa-copy"></i></button>
-                        </div>
-                        ${acc.note ? `<p class="text-[10px] text-indigo-400 mt-0.5"><i class="fa-solid fa-tag mr-1"></i>${acc.note}</p>` : ''}
-                    </td>
-                    <td class="p-3">
-                        <div class="code-font text-[11px] text-slate-400 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800/80 max-w-[280px] truncate" title="${acc.rawData}">
-                            ${acc.rawData}
-                        </div>
-                    </td>
-                    <td class="p-3">
-                        <div id="countdown-${acc.id}" class="font-mono text-xs font-medium">--:--:--</div>
-                        <div class="text-[10px] text-slate-500 mt-0.5">Mở ban: ${banEndDate.toLocaleString('vi-VN')}</div>
-                    </td>
-                    <td class="p-3 text-center" id="status-badge-${acc.id}">
-                        <!-- Status Badge dynamically calculated -->
-                    </td>
-                    <td class="p-3 text-right">
-                        <div class="flex items-center justify-end space-x-1">
-                            <button onclick="copyToClipboard('${acc.rawData.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded text-[11px] font-medium transition" title="Copy Toàn Bộ Raw">
-                                <i class="fa-solid fa-copy mr-1"></i>Full
-                            </button>
-                            ${acc.password ? `
-                            <button onclick="copyToClipboard('${acc.password}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition" title="Copy Pass">Pass</button>
-                            ` : ''}
-                            ${acc.token ? `
-                            <button onclick="copyToClipboard('${acc.token}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition" title="Copy Token">Token</button>
-                            ` : ''}
-                            <button onclick="deleteAccount('${acc.id}')" class="p-1 text-slate-500 hover:text-rose-400 transition" title="Xóa">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-
-                tbody.appendChild(tr);
-            });
-
-            updateCountdowns();
-        }
-
-        // Update Live Countdowns
-        function updateCountdowns() {
-            const now = new Date();
-
-            filteredList.forEach(acc => {
-                const cdElem = document.getElementById(`countdown-${acc.id}`);
-                const badgeElem = document.getElementById(`status-badge-${acc.id}`);
-                if (!cdElem || !badgeElem) return;
-
+            tbody.innerHTML = list.map(acc => {
                 const banEnd = new Date(acc.banEnd);
+                const isUnbanned = now >= banEnd;
                 const diffMs = banEnd - now;
 
-                if (diffMs <= 0) {
-                    cdElem.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>Đã Mở Ban</span>`;
-                    badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[10px]">ĐÃ MỞ BAN</span>`;
+                let statusBadge = '';
+                let countdownHtml = '';
+
+                if (isUnbanned) {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-1"><i class="fa-solid fa-check"></i> Đã Mở Ban</span>`;
+                    countdownHtml = `<span class="text-emerald-400 font-mono font-medium">00:00:00 (Đã mở ban)</span>`;
                 } else {
-                    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-                    const pad = (n) => n.toString().padStart(2, '0');
-                    const timeStr = `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
-
-                    if (diffMs <= 3600 * 1000) {
-                        // Under 1 hour
-                        cdElem.innerHTML = `<span class="text-amber-400 font-bold animate-pulse">${timeStr}</span>`;
-                        badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 font-medium text-[10px] pulse-badge">SẮP MỞ BAN</span>`;
+                    const hoursRemaining = diffMs / (1000 * 60 * 60);
+                    if (hoursRemaining <= 24) {
+                        statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center gap-1"><i class="fa-solid fa-clock"></i> Sắp Mở Ban (&lt;24h)</span>`;
                     } else {
-                        cdElem.innerHTML = `<span class="text-rose-400">${timeStr}</span>`;
-                        badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium text-[10px]">ĐANG BAN</span>`;
+                        statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center gap-1"><i class="fa-solid fa-lock"></i> Đang Bị Ban</span>`;
                     }
+
+                    countdownHtml = `<span class="countdown-timer font-mono text-indigo-300 font-semibold" data-end="${acc.banEnd}">${formatTimeDiff(diffMs)}</span>`;
+                }
+
+                const endDateFormatted = banEnd.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition border-b border-slate-800/40">
+                        <td class="p-3 text-center">
+                            <input type="checkbox" value="${acc.id}" class="acc-checkbox rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0">
+                        </td>
+                        <td class="p-3 space-y-1">
+                            <div class="font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-regular fa-envelope text-indigo-400"></i> ${acc.email}
+                            </div>
+                            <div class="text-[11px] text-slate-400 code-font flex items-center gap-2">
+                                <span>Pass: <code class="text-slate-300">${acc.password || 'N/A'}</code></span>
+                                <span>UUID: <code class="text-slate-400">${acc.uuid ? acc.uuid.substring(0, 8) + '...' : 'N/A'}</code></span>
+                            </div>
+                            ${acc.note ? `<div class="text-[11px] text-amber-300/80 italic"><i class="fa-regular fa-sticky-note"></i> ${acc.note}</div>` : ''}
+                        </td>
+                        <td class="p-3 max-w-xs">
+                            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-400 truncate flex items-center justify-between">
+                                <span class="truncate pr-2">${acc.rawData}</span>
+                                <button onclick="copyToClipboard('${acc.rawData.replace(/'/g, "\\'")}')" class="text-slate-500 hover:text-indigo-400 transition" title="Copy Raw">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td class="p-3 space-y-0.5">
+                            <div>${countdownHtml}</div>
+                            <div class="text-[10px] text-slate-500">Mở ban: ${endDateFormatted}</div>
+                        </td>
+                        <td class="p-3 text-center">
+                            ${statusBadge}
+                        </td>
+                        <td class="p-3 text-right space-x-1">
+                            <button onclick="copyToClipboard('${acc.rawData.replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 text-xs transition" title="Copy Chuỗi Raw">
+                                <i class="fa-solid fa-copy"></i> Copy
+                            </button>
+                            <button onclick="openEditModal(${acc.id})" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 rounded-lg border border-indigo-500/30 text-xs transition" title="Sửa">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteAccount(${acc.id})" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 rounded-lg border border-rose-500/30 text-xs transition" title="Xóa">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function formatTimeDiff(ms) {
+            if (ms <= 0) return "00:00:00";
+            const seconds = Math.floor((ms / 1000) % 60);
+            const minutes = Math.floor((ms / (1000 * 60)) % 60);
+            const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
+            const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+
+            const pad = n => n.toString().padStart(2, '0');
+            if (days > 0) {
+                return `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+            }
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        function updateCountdowns() {
+            const timers = document.querySelectorAll('.countdown-timer');
+            const now = new Date();
+
+            timers.forEach(timer => {
+                const endStr = timer.getAttribute('data-end');
+                if (!endStr) return;
+                const end = new Date(endStr);
+                const diff = end - now;
+
+                if (diff <= 0) {
+                    timer.className = "text-emerald-400 font-mono font-medium";
+                    timer.innerText = "00:00:00 (Đã mở ban)";
+                    filterAccounts();
+                } else {
+                    timer.innerText = formatTimeDiff(diff);
                 }
             });
         }
 
-        // Check and Trigger Web Notification + Sound
+        async function submitBulkAccounts() {
+            const rawLines = document.getElementById('bulkRawData').value;
+            let banStart = document.getElementById('banStartInput').value;
+            const banEnd = document.getElementById('banEndInput').value;
+            const note = document.getElementById('noteInput').value;
+
+            if (!rawLines.trim()) {
+                showToast("Vui lòng dán danh sách tài khoản!", "error");
+                return;
+            }
+
+            if (!banStart) {
+                banStart = formatDateTimeLocal(new Date());
+                document.getElementById('banStartInput').value = banStart;
+            }
+
+            if (!banEnd) {
+                showToast("Vui lòng chọn hoặc bấm nút chọn nhanh thời hạn Mở Ban!", "error");
+                return;
+            }
+
+            if (isOnlineServer) {
+                try {
+                    const res = await fetch('/api/accounts/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rawLines, banStart, banEnd, note })
+                    });
+
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(data.message, "success");
+                        document.getElementById('bulkRawData').value = '';
+                        document.getElementById('noteInput').value = '';
+                        setCurrentTimeAsStart();
+                        document.getElementById('banEndInput').value = '';
+                        fetchAccounts();
+                    } else {
+                        showToast(data.error || "Có lỗi xảy ra", "error");
+                    }
+                } catch (err) {
+                    showToast("Không thể kết nối đến máy chủ!", "error");
+                }
+            } else {
+                const lines = rawLines.split('\n').filter(l => l.trim().length > 0);
+                const startIso = new Date(banStart).toISOString();
+                const endIso = new Date(banEnd).toISOString();
+
+                lines.forEach((line, index) => {
+                    const parsed = parseRawLineJS(line);
+                    if (parsed) {
+                        accountsList.push({
+                            id: Date.now() + index,
+                            ...parsed,
+                            banStart: startIso,
+                            banEnd: endIso,
+                            notified: false,
+                            note: note || '',
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                });
+
+                localStorage.setItem('ban_accounts_offline', JSON.stringify(accountsList));
+                showToast(`Đã lưu ${lines.length} tài khoản (Local Mode)!`, "success");
+                document.getElementById('bulkRawData').value = '';
+                document.getElementById('noteInput').value = '';
+                setCurrentTimeAsStart();
+                document.getElementById('banEndInput').value = '';
+                filterAccounts();
+            }
+        }
+
+        function openEditModal(id) {
+            const acc = accountsList.find(a => a.id === id);
+            if (!acc) return;
+
+            document.getElementById('editAccountId').value = acc.id;
+            document.getElementById('editAccountEmail').value = acc.email;
+            document.getElementById('editBanEndInput').value = formatDateTimeLocal(acc.banEnd);
+            document.getElementById('editNoteInput').value = acc.note || '';
+
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        async function saveAccountEdit() {
+            const id = parseInt(document.getElementById('editAccountId').value);
+            const banEnd = document.getElementById('editBanEndInput').value;
+            const note = document.getElementById('editNoteInput').value;
+
+            if (!banEnd) {
+                showToast("Vui lòng chọn thời gian mở ban!", "error");
+                return;
+            }
+
+            const endIso = new Date(banEnd).toISOString();
+
+            if (isOnlineServer) {
+                try {
+                    const res = await fetch(`/api/accounts/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ banEnd: endIso, note })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast("Đã cập nhật thông tin tài khoản!", "success");
+                        closeEditModal();
+                        fetchAccounts();
+                    }
+                } catch (err) {
+                    showToast("Cập nhật thất bại!", "error");
+                }
+            } else {
+                const acc = accountsList.find(a => a.id === id);
+                if (acc) {
+                    acc.banEnd = endIso;
+                    acc.note = note;
+                    localStorage.setItem('ban_accounts_offline', JSON.stringify(accountsList));
+                    showToast("Đã cập nhật tài khoản!", "success");
+                    closeEditModal();
+                    filterAccounts();
+                }
+            }
+        }
+
         function checkAndNotifyUnbanned() {
             const now = new Date();
 
             accountsList.forEach(acc => {
                 const banEnd = new Date(acc.banEnd);
                 if (now >= banEnd && !acc.notified) {
-                    // Trigger Sound
                     if (soundEnabled) {
                         const audio = document.getElementById('unbanSound');
-                        audio.play().catch(e => console.log('Audio autoplay prevented'));
+                        if (audio) {
+                            audio.play().catch(e => console.log('Âm thanh bị chặn do tương tác'));
+                        }
                     }
 
-                    // Trigger Web Push Notification
                     if ("Notification" in window && Notification.permission === "granted") {
-                        new Notification("🎉 Tài khoản đã MỞ BAN!", {
-                            body: `Tài khoản [${acc.email}] đã hết hạn ban. Nhấp vào đây để copy dữ liệu!`,
+                        new Notification("🎉 TÀI KHOẢN ĐÃ MỞ BAN!", {
+                            body: `Tài khoản ${acc.email} vừa hết hạn ban!`,
                             icon: "https://cdn-icons-png.flaticon.com/512/190/190411.png"
                         });
                     }
 
-                    // Show Toast Notification
-                    showToast(`Tài khoản [${acc.email}] đã mở ban!`, "success");
-
-                    // Mark as notified in SQLite
-                    fetch(`/api/accounts/${acc.id}/notified`, { method: 'POST' });
+                    if (isOnlineServer) {
+                        fetch(`/api/accounts/${acc.id}/notified`, { method: 'POST' });
+                    } else {
+                        acc.notified = true;
+                        localStorage.setItem('ban_accounts_offline', JSON.stringify(accountsList));
+                    }
                 }
             });
         }
 
-        // Copy Single Item
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                showToast("Đã copy thành công!", "success");
-            }).catch(err => {
-                showToast("Không thể copy!", "error");
+                showToast("Đã copy vào bộ nhớ tạm!", "success");
+            }).catch(() => {
+                showToast("Lỗi khi copy!", "error");
             });
         }
 
-        // Copy All Unbanned Raw Accounts
+        function copySelectedRawBatch() {
+            const selectedBoxes = document.querySelectorAll('.acc-checkbox:checked');
+            const ids = Array.from(selectedBoxes).map(cb => parseInt(cb.value));
+
+            if (ids.length === 0) {
+                showToast("Vui lòng tích chọn ít nhất 1 tài khoản!", "warning");
+                return;
+            }
+
+            const selectedRaws = accountsList
+                .filter(a => ids.includes(a.id))
+                .map(a => a.rawData)
+                .join('\n');
+
+            copyToClipboard(selectedRaws);
+            showToast(`Đã copy ${ids.length} tài khoản!`, "success");
+        }
+
         function copyUnbannedRawBatch() {
             const now = new Date();
             const unbannedRaws = accountsList
@@ -599,16 +804,14 @@
             }
 
             copyToClipboard(unbannedRaws);
-            showToast(`Đã copy ${unbannedRaws.split('\n').length} tài khoản đã mở ban!`, "success");
+            showToast(`Đã copy toàn bộ tài khoản mở ban!`, "success");
         }
 
-        // Select All Checkbox Toggle
         function toggleSelectAll(master) {
             const checkboxes = document.querySelectorAll('.acc-checkbox');
             checkboxes.forEach(cb => cb.checked = master.checked);
         }
 
-        // Batch Delete
         async function deleteSelectedBatch() {
             const selectedBoxes = document.querySelectorAll('.acc-checkbox:checked');
             const ids = Array.from(selectedBoxes).map(cb => parseInt(cb.value));
@@ -619,45 +822,57 @@
             }
 
             if (confirm(`Bạn có chắc muốn xóa ${ids.length} tài khoản đã chọn?`)) {
-                try {
-                    const res = await fetch('/api/accounts/batch-delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showToast(`Đã xóa ${data.deletedCount} tài khoản!`, "success");
-                        fetchAccounts();
+                if (isOnlineServer) {
+                    try {
+                        const res = await fetch('/api/accounts/batch-delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(`Đã xóa ${data.deletedCount} tài khoản!`, "success");
+                            fetchAccounts();
+                        }
+                    } catch (err) {
+                        showToast("Xóa thất bại!", "error");
                     }
-                } catch (err) {
-                    showToast("Xóa thất bại!", "error");
+                } else {
+                    accountsList = accountsList.filter(a => !ids.includes(a.id));
+                    localStorage.setItem('ban_accounts_offline', JSON.stringify(accountsList));
+                    showToast(`Đã xóa ${ids.length} tài khoản!`, "success");
+                    filterAccounts();
                 }
             }
         }
 
-        // Delete Single Account
         async function deleteAccount(id) {
-            if (confirm("Xóa tài khoản này khỏi SQLite?")) {
-                await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
-                showToast("Đã xóa tài khoản!", "success");
-                fetchAccounts();
+            if (confirm("Xóa tài khoản này?")) {
+                if (isOnlineServer) {
+                    await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+                    showToast("Đã xóa tài khoản!", "success");
+                    fetchAccounts();
+                } else {
+                    accountsList = accountsList.filter(a => a.id !== id);
+                    localStorage.setItem('ban_accounts_offline', JSON.stringify(accountsList));
+                    showToast("Đã xóa tài khoản!", "success");
+                    filterAccounts();
+                }
             }
         }
 
-        // Export to CSV
         function exportToCSV() {
             if (accountsList.length === 0) {
                 showToast("Không có dữ liệu để xuất!", "warning");
                 return;
             }
 
-            let csv = "ID,Email,Password,Token,UUID,BanStart,BanEnd,Status,RawData\n";
+            let csv = "ID,Email,Password,Token,UUID,BanStart,BanEnd,Status,Note,RawData\n";
             const now = new Date();
 
             accountsList.forEach(a => {
                 const status = new Date(a.banEnd) <= now ? 'UNBANNED' : 'BANNED';
-                csv += `"${a.id}","${a.email}","${a.password}","${a.token}","${a.uuid}","${a.banStart}","${a.banEnd}","${status}","${a.rawData.replace(/"/g, '""')}"\n`;
+                csv += `"${a.id}","${a.email}","${a.password}","${a.token}","${a.uuid}","${a.banStart}","${a.banEnd}","${status}","${(a.note || '').replace(/"/g, '""')}","${a.rawData.replace(/"/g, '""')}"\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -669,7 +884,6 @@
             URL.revokeObjectURL(url);
         }
 
-        // Toast Notification System
         function showToast(message, type = "info") {
             const toast = document.createElement('div');
             let bgColor = "bg-slate-800 border-slate-700 text-white";
