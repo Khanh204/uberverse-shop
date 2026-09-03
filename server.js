@@ -1,185 +1,137 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const https = require('https');
 const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Cấu hình đường dẫn lưu SQLite: Lưu trực tiếp tại thư mục chạy app
 const DB_PATH = path.join(__dirname, 'database.sqlite');
 
-// Middlewares xử lý JSON và Static Files
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.static(__dirname));
+// Đọc Token và Chat ID từ Environment Variables trên Render (hoặc dùng chuỗi mặc định nếu chạy local)
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
-    if (err) {
-        console.error('Lỗi khi kết nối cơ sở dữ liệu SQLite:', err.message);
-    } else {
-        console.log('-> Kết nối SQLite Database thành công!');
+// Hàm gửi tin nhắn qua Telegram Bot API
+function sendTelegramMessage(text) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+        console.log('Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID');
+        return;
     }
-});
 
-// Tạo bảng tài khoản đầy đủ các trường thông tin nâng cao
-db.serialize(() => {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS accounts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT,
-            password TEXT,
-            token TEXT,
-            uuid TEXT,
-            rawData TEXT NOT NULL,
-            banStart TEXT,
-            banEnd TEXT NOT NULL,
-            notified INTEGER DEFAULT 0,
-            note TEXT,
-            createdAt TEXT
-        )
-    `);
-});
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const data = JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: text,
+        parse_mode: 'HTML'
+    });
 
-// Hàm phân tích cú pháp tự động từ chuỗi raw Email|Pass|Token|UUID
-function parseRawLine(line) {
-    if (!line || !line.trim()) return null;
-    const cleanLine = line.trim();
-    const parts = cleanLine.split('|');
-    return {
-        email: parts[0] ? parts[0].trim() : 'N/A',
-        password: parts[1] ? parts[1].trim() : '',
-        token: parts[2] ? parts[2].trim() : '',
-        uuid: parts[3] ? parts[3].trim() : '',
-        rawData: cleanLine
-    };
+    const parsedUrl = new URL(url);
+    const req = https.request({
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.pathname,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data)
+        }
+    });
+
+    req.on('error', (e) => console.error('Lỗi gửi Telegram:', e.message));
+    req.write(data);
+    req.end();
 }
 
+app.use(express.json());
+app.use(express.static(__dirname));
 
-// API 1: Lấy danh sách tài khoản
+// Kết nối cơ sở dữ liệu SQLite
+const db = new sqlite3.Database(DB_PATH, (err) => {
+    if (err) console.error('Lỗi kết nối SQLite:', err.message);
+    else console.log(`Đã kết nối thành công SQLite tại: ${DB_PATH}`);
+});
+
+// Khai báo bảng lưu dữ liệu tài khoản
+db.run(`
+    CREATE TABLE IF NOT EXISTS accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT,
+        rawData TEXT NOT NULL,
+        banStart TEXT,
+        banEnd TEXT NOT NULL,
+        notified INTEGER DEFAULT 0
+    )
+`);
+
+// TIẾN TRÌNH QUÉT NGẦM: Chạy tự động mỗi 30 giây để kiểm tra và gửi Telegram
+setInterval(() => {
+    const now = new Date().toISOString();
+    const sql = `SELECT * FROM accounts WHERE banEnd <= ? AND notified = 0`;
+
+    db.all(sql, [now], (err, rows) => {
+        if (err || !rows || rows.length === 0) return;
+
+        rows.forEach(acc => {
+            const formattedDate = new Date(acc.banEnd).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+            
+            // Nội dung tin nhắn gửi về Telegram
+            const msg = `🎉 <b>TÀI KHOẢN ĐÃ ĐƯỢC MỞ BAN!</b>\n\n` +
+                        `📧 <b>Email:</b> <code>${acc.email}</code>\n` +
+                        `⏰ <b>Hạn mở ban:</b> ${formattedDate}\n\n` +
+                        `📋 <b>Full Data:</b>\n<code>${acc.rawData}</code>`;
+
+            // 1. Gửi tin nhắn đến điện thoại
+            sendTelegramMessage(msg);
+
+            // 2. Đánh dấu đã thông báo trong CSDL để tránh gửi lặp lại
+            db.run(`UPDATE accounts SET notified = 1 WHERE id = ?`, [acc.id]);
+        });
+    });
+}, 30000);
+
+// API: Lấy danh sách toàn bộ tài khoản
 app.get('/api/accounts', (req, res) => {
-    const sql = `SELECT * FROM accounts ORDER BY banEnd ASC`;
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: 'Lỗi truy vấn cơ sở dữ liệu: ' + err.message });
-        }
-        const formatted = rows.map(r => ({
-            ...r,
-            notified: Boolean(r.notified)
-        }));
-        res.json(formatted);
-    });
-});
-
-// API 2: Nhập hàng loạt tài khoản (Bulk Add)
-app.post('/api/accounts/bulk', (req, res) => {
-    const { rawLines, banStart, banEnd, hoursToAdd, note } = req.body;
-
-    if (!rawLines || typeof rawLines !== 'string') {
-        return res.status(400).json({ error: 'Dữ liệu tài khoản không hợp lệ!' });
-    }
-
-    const lines = rawLines.split('\n').filter(l => l.trim().length > 0);
-    if (lines.length === 0) {
-        return res.status(400).json({ error: 'Không tìm thấy dòng dữ liệu nào!' });
-    }
-
-    const nowIso = new Date().toISOString();
-    const startIso = banStart ? new Date(banStart).toISOString() : nowIso;
-
-    // Tính toán ngày mở ban nếu người dùng truyền số giờ thay vì datetime cụ thể
-    let endIso = banEnd ? new Date(banEnd).toISOString() : null;
-    if (!endIso && hoursToAdd) {
-        const endDate = new Date(new Date(startIso).getTime() + parseFloat(hoursToAdd) * 3600 * 1000);
-        endIso = endDate.toISOString();
-    }
-
-    if (!endIso) {
-        return res.status(400).json({ error: 'Vui lòng cung cấp ngày mở ban hoặc khoảng thời gian ban!' });
-    }
-
-    const stmt = db.prepare(`
-        INSERT INTO accounts (email, password, token, uuid, rawData, banStart, banEnd, notified, note, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-    `);
-
-    let addedCount = 0;
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        lines.forEach(line => {
-            const parsed = parseRawLine(line);
-            if (parsed) {
-                stmt.run([
-                    parsed.email,
-                    parsed.password,
-                    parsed.token,
-                    parsed.uuid,
-                    parsed.rawData,
-                    startIso,
-                    endIso,
-                    note || '',
-                    nowIso
-                ]);
-                addedCount++;
-            }
-        });
-        db.run("COMMIT", (err) => {
-            stmt.finalize();
-            if (err) {
-                return res.status(500).json({ error: 'Lỗi khi lưu dữ liệu hàng loạt: ' + err.message });
-            }
-            res.json({ success: true, count: addedCount, message: `Thêm thành công ${addedCount} tài khoản!` });
-        });
-    });
-});
-
-
-// API 3: Đánh dấu đã phát thông báo
-app.post('/api/accounts/:id/notified', (req, res) => {
-    const { id } = req.params;
-    db.run(`UPDATE accounts SET notified = 1 WHERE id = ?`, [id], function (err) {
+    db.all('SELECT * FROM accounts ORDER BY id DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+        res.json(rows.map(r => ({ ...r, notified: Boolean(r.notified) })));
     });
 });
 
-// API 4: Cập nhật ghi chú hoặc thời gian ban
-app.put('/api/accounts/:id', (req, res) => {
-    const { id } = req.params;
-    const { note, banEnd } = req.body;
-    db.run(
-        `UPDATE accounts SET note = COALESCE(?, note), banEnd = COALESCE(?, banEnd) WHERE id = ?`,
-        [note, banEnd, id],
-        function (err) {
+// API: Thêm tài khoản mới
+app.post('/api/accounts', (req, res) => {
+    const { rawData, banStart, banEnd } = req.body;
+    if (!rawData || !banEnd) return res.status(400).json({ error: 'Thiếu thông tin bắt buộc!' });
+
+    const email = (rawData.split('|')[0] || 'Unknown').trim();
+    const start = banStart || new Date().toISOString();
+
+    db.run(`INSERT INTO accounts (email, rawData, banStart, banEnd, notified) VALUES (?, ?, ?, ?, 0)`, 
+        [email, rawData.trim(), start, banEnd], 
+        function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
+            res.json({ success: true, id: this.lastID });
         }
     );
 });
 
-// API 5: Xóa đơn lẻ
-app.delete('/api/accounts/:id', (req, res) => {
-    const { id } = req.params;
-    db.run(`DELETE FROM accounts WHERE id = ?`, [id], function (err) {
+// API: Đánh dấu đã thông báo thủ công (nếu cần)
+app.post('/api/accounts/:id/notified', (req, res) => {
+    db.run(`UPDATE accounts SET notified = 1 WHERE id = ?`, [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });
 });
 
-// API 6: Xóa hàng loạt
-app.post('/api/accounts/batch-delete', (req, res) => {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).json({ error: 'Danh sách ID không hợp lệ!' });
-    }
-    const placeholders = ids.map(() => '?').join(',');
-    db.run(`DELETE FROM accounts WHERE id IN (${placeholders})`, ids, function (err) {
+// API: Xóa tài khoản
+app.delete('/api/accounts/:id', (req, res) => {
+    db.run(`DELETE FROM accounts WHERE id = ?`, [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, deletedCount: this.changes });
+        res.json({ success: true });
     });
 });
 
 app.listen(PORT, () => {
-    console.log(`================================================`);
-    console.log(`🚀 Ban Account Manager Pro đang khởi chạy!`);
-    console.log(`🌐 Truy cập đường dẫn: http://localhost:${PORT}`);
-    console.log(`================================================`);
+    console.log(`Server đang hoạt động tại cổng: ${PORT}`);
 });
