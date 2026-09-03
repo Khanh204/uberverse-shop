@@ -626,12 +626,16 @@
                 return;
             }
 
+            // Ép kiểu thời gian người dùng chọn sang chuẩn chuỗi ISO UTC trước khi gửi
+            const startIso = new Date(banStart).toISOString();
+            const endIso = new Date(banEnd).toISOString();
+
             if (isOnlineServer) {
                 try {
                     const res = await fetch('/api/accounts/bulk', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ rawLines, banStart, banEnd, note })
+                        body: JSON.stringify({ rawLines, banStart: startIso, banEnd: endIso, note })
                     });
 
                     const data = await res.json();
@@ -650,8 +654,6 @@
                 }
             } else {
                 const lines = rawLines.split('\n').filter(l => l.trim().length > 0);
-                const startIso = new Date(banStart).toISOString();
-                const endIso = new Date(banEnd).toISOString();
 
                 lines.forEach((line, index) => {
                     const parsed = parseRawLineJS(line);
@@ -704,6 +706,7 @@
                 return;
             }
 
+            // Ép kiểu thời gian cập nhật sang ISO UTC
             const endIso = new Date(banEnd).toISOString();
 
             if (isOnlineServer) {
