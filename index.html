@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Quản Lý & Cảnh Báo Tài Khoản Bị Ban Pro</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        },
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .pulse-badge {
+            animation: pulse-glow 2s infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.03); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+
+    <!-- Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-shield-halved text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white flex items-center gap-2">
+                        BAN MANAGER PRO
+                        <span class="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">v2.5 SQLite</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Hệ thống quản lý, đếm ngược & mở ban tự động</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions -->
+            <div class="flex items-center space-x-3">
+                <button id="soundToggleBtn" onclick="toggleSound()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-indigo-400"></i>
+                    <span id="soundText">Âm thanh: Bật</span>
+                </button>
+                <button onclick="requestNotificationPermission()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md shadow-indigo-600/20 transition">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>Bật Thông Báo</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Tổng Tài Khoản</p>
+                    <h3 id="statTotal" class="text-2xl font-bold text-white mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đang Bị Ban</p>
+                    <h3 id="statBanned" class="text-2xl font-bold text-rose-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-user-lock"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sắp Mở Ban (&lt;24h)</p>
+                    <h3 id="statExpiringSoon" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Đã Mở Ban</p>
+                    <h3 id="statUnbanned" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Accounts Panel / Accordion -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="bg-slate-800/60 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-plus-circle text-indigo-400"></i>
+                    <h2 class="font-semibold text-white text-sm">Thêm Tài Khoản Bị Ban Hàng Loạt</h2>
+                </div>
+                <span class="text-xs text-slate-400">Hỗ trợ tự động phân tích định dạng <code class="text-indigo-300 font-mono">Email|Pass|Token|UUID</code></span>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">
+                        Danh sách tài khoản (Dán mỗi tài khoản 1 dòng):
+                    </label>
+                    <textarea id="bulkRawData" rows="4" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs code-font text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 custom-scrollbar"
+                        placeholder="MyrnaDubie138543@hotmail.com|ofuja450587|M.C529_BAY.0.U...|9e5f94bc-e8a4-4e73-b8be-63364c29d753&#10;account2@gmail.com|pass123|tokenabc|uuidxyz"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Thời gian bắt đầu ban:</label>
+                        <input type="datetime-local" id="banStartInput" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Thời điểm Mở Ban cụ thể:</label>
+                        <input type="datetime-local" id="banEndInput" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Hoặc chọn thời hạn Ban nhanh:</label>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" onclick="setBanQuickHours(24)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">1 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(72)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">3 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(168)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">7 Ngày</button>
+                            <button type="button" onclick="setBanQuickHours(720)" class="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">30 Ngày</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <div class="flex items-center space-x-2 w-1/2">
+                        <input type="text" id="noteInput" placeholder="Ghi chú thêm (Ví dụ: Lỗi Spam, Lỗi Game...)" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button onclick="submitBulkAccounts()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Lưu Danh Sách Về SQLite</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Accounts Data Table Section -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            
+            <!-- Toolbar -->
+            <div class="p-4 border-b border-slate-800 bg-slate-800/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                
+                <!-- Search & Filter -->
+                <div class="flex items-center space-x-3 w-full sm:w-auto flex-1">
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="filterAccounts()" placeholder="Tìm theo Email, Token, UUID..." 
+                            class="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <select id="statusFilter" onchange="filterAccounts()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500">
+                        <option value="ALL">Tất cả trạng thái</option>
+                        <option value="BANNED">Đang bị Ban</option>
+                        <option value="SOON">Sắp mở ban (&lt;24h)</option>
+                        <option value="UNBANNED">Đã mở Ban</option>
+                    </select>
+                </div>
+
+                <!-- Batch Actions -->
+                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <button onclick="copyUnbannedRawBatch()" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-medium rounded-xl transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>Copy Hết Acc Mở Ban</span>
+                    </button>
+
+                    <button onclick="deleteSelectedBatch()" class="px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-medium rounded-xl transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Xóa Chọn</span>
+                    </button>
+
+                    <button onclick="exportToCSV()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium rounded-xl transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>Xuất CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-950/60 text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-800">
+                            <th class="p-3 w-10 text-center">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0">
+                            </th>
+                            <th class="p-3">Thông Tin Tài Khoản</th>
+                            <th class="p-3">Chuỗi Gốc (Raw)</th>
+                            <th class="p-3">Đếm Ngược / Thời Hạn</th>
+                            <th class="p-3 text-center">Trạng Thái</th>
+                            <th class="p-3 text-right">Thao Tác Fast-Copy</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountTableBody" class="divide-y divide-slate-800/60 text-xs">
+                        <!-- Dynamic Account Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden p-12 text-center">
+                <div class="w-16 h-16 bg-slate-800 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-solid fa-folder-open"></i>
+                </div>
+                <p class="text-slate-400 font-medium">Chưa có dữ liệu tài khoản nào</p>
+                <p class="text-slate-600 text-xs mt-1">Hãy dán tài khoản vào khung phía trên và nhấn "Lưu Danh Sách"</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Sound Effects Element -->
+    <audio id="unbanSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <script>
+        // Global States
+        let accountsList = [];
+        let filteredList = [];
+        let soundEnabled = true;
+
+        // Auto initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set default ban start to current date time
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('banStartInput').value = now.toISOString().slice(0, 16);
+
+            fetchAccounts();
+
+            // Refresh table and countdowns every 1 second
+            setInterval(updateCountdowns, 1000);
+            // Fetch fresh data from backend every 15 seconds
+            setInterval(fetchAccounts, 15000);
+        });
+
+        // Toggle Sound Alert
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const soundIcon = document.getElementById('soundIcon');
+            const soundText = document.getElementById('soundText');
+            if (soundEnabled) {
+                soundIcon.className = "fa-solid fa-volume-high text-indigo-400";
+                soundText.innerText = "Âm thanh: Bật";
+            } else {
+                soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+                soundText.innerText = "Âm thanh: Tắt";
+            }
+        }
+
+        // Request Browser Notification Permission
+        function requestNotificationPermission() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        showToast("Đã cấp quyền thông báo trình duyệt thành công!", "success");
+                    } else {
+                        showToast("Quyền thông báo bị từ chối hoặc bị chặn.", "warning");
+                    }
+                });
+            } else {
+                showToast("Trình duyệt không hỗ trợ Web Notification.", "error");
+            }
+        }
+
+        // Quick set ban hours helper
+        function setBanQuickHours(hours) {
+            const startVal = document.getElementById('banStartInput').value;
+            const startDate = startVal ? new Date(startVal) : new Date();
+            const endDate = new Date(startDate.getTime() + hours * 3600 * 1000);
+            
+            endDate.setMinutes(endDate.getMinutes() - endDate.getTimezoneOffset());
+            document.getElementById('banEndInput').value = endDate.toISOString().slice(0, 16);
+        }
+
+        // Fetch accounts from SQLite backend
+        async function fetchAccounts() {
+            try {
+                const res = await fetch('/api/accounts');
+                if (!res.ok) throw new Error('Không thể tải danh sách tài khoản');
+                accountsList = await res.json();
+                filterAccounts();
+                checkAndNotifyUnbanned();
+            } catch (err) {
+                console.error("Fetch Error:", err);
+            }
+        }
+
+        // Submit Bulk Accounts
+        async function submitBulkAccounts() {
+            const rawLines = document.getElementById('bulkRawData').value;
+            const banStart = document.getElementById('banStartInput').value;
+            const banEnd = document.getElementById('banEndInput').value;
+            const note = document.getElementById('noteInput').value;
+
+            if (!rawLines.trim()) {
+                showToast("Vui lòng dán danh sách tài khoản!", "error");
+                return;
+            }
+
+            if (!banEnd) {
+                showToast("Vui lòng chọn thời gian mở ban!", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/accounts/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rawLines, banStart, banEnd, note })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, "success");
+                    document.getElementById('bulkRawData').value = '';
+                    document.getElementById('noteInput').value = '';
+                    fetchAccounts();
+                } else {
+                    showToast(data.error || "Có lỗi xảy ra", "error");
+                }
+            } catch (err) {
+                showToast("Không thể kết nối đến máy chủ!", "error");
+            }
+        }
+
+        // Filter & Search Logic
+        function filterAccounts() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            const now = new Date();
+
+            filteredList = accountsList.filter(acc => {
+                const banEnd = new Date(acc.banEnd);
+                const diffMs = banEnd - now;
+                const isUnbanned = diffMs <= 0;
+                const isExpiringSoon = diffMs > 0 && diffMs <= 24 * 3600 * 1000;
+
+                // Match Search
+                const matchSearch = (acc.email || '').toLowerCase().includes(query) ||
+                                    (acc.rawData || '').toLowerCase().includes(query) ||
+                                    (acc.token || '').toLowerCase().includes(query) ||
+                                    (acc.uuid || '').toLowerCase().includes(query);
+
+                // Match Status
+                let matchStatus = true;
+                if (status === 'BANNED') matchStatus = !isUnbanned;
+                else if (status === 'SOON') matchStatus = isExpiringSoon;
+                else if (status === 'UNBANNED') matchStatus = isUnbanned;
+
+                return matchSearch && matchStatus;
+            });
+
+            updateStats();
+            renderTable();
+        }
+
+        // Calculate Statistics
+        function updateStats() {
+            const now = new Date();
+            let total = accountsList.length;
+            let banned = 0;
+            let expiringSoon = 0;
+            let unbanned = 0;
+
+            accountsList.forEach(acc => {
+                const diffMs = new Date(acc.banEnd) - now;
+                if (diffMs <= 0) {
+                    unbanned++;
+                } else {
+                    banned++;
+                    if (diffMs <= 24 * 3600 * 1000) {
+                        expiringSoon++;
+                    }
+                }
+            });
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statBanned').innerText = banned;
+            document.getElementById('statExpiringSoon').innerText = expiringSoon;
+            document.getElementById('statUnbanned').innerText = unbanned;
+        }
+
+        // Render Table Rows
+        function renderTable() {
+            const tbody = document.getElementById('accountTableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            tbody.innerHTML = '';
+
+            if (filteredList.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            const now = new Date();
+
+            filteredList.forEach(acc => {
+                const banEndDate = new Date(acc.banEnd);
+                const isUnbanned = now >= banEndDate;
+
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-800/40 transition border-b border-slate-800/40 ${isUnbanned ? 'bg-emerald-950/10' : ''}`;
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center">
+                        <input type="checkbox" value="${acc.id}" class="acc-checkbox rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0">
+                    </td>
+                    <td class="p-3">
+                        <div class="font-semibold text-slate-100 flex items-center space-x-1.5">
+                            <span class="truncate max-w-[180px] inline-block" title="${acc.email}">${acc.email}</span>
+                            <button onclick="copyToClipboard('${acc.email}')" title="Copy Email" class="text-slate-500 hover:text-indigo-400"><i class="fa-regular fa-copy"></i></button>
+                        </div>
+                        ${acc.note ? `<p class="text-[10px] text-indigo-400 mt-0.5"><i class="fa-solid fa-tag mr-1"></i>${acc.note}</p>` : ''}
+                    </td>
+                    <td class="p-3">
+                        <div class="code-font text-[11px] text-slate-400 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800/80 max-w-[280px] truncate" title="${acc.rawData}">
+                            ${acc.rawData}
+                        </div>
+                    </td>
+                    <td class="p-3">
+                        <div id="countdown-${acc.id}" class="font-mono text-xs font-medium">--:--:--</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">Mở ban: ${banEndDate.toLocaleString('vi-VN')}</div>
+                    </td>
+                    <td class="p-3 text-center" id="status-badge-${acc.id}">
+                        <!-- Status Badge dynamically calculated -->
+                    </td>
+                    <td class="p-3 text-right">
+                        <div class="flex items-center justify-end space-x-1">
+                            <button onclick="copyToClipboard('${acc.rawData.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded text-[11px] font-medium transition" title="Copy Toàn Bộ Raw">
+                                <i class="fa-solid fa-copy mr-1"></i>Full
+                            </button>
+                            ${acc.password ? `
+                            <button onclick="copyToClipboard('${acc.password}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition" title="Copy Pass">Pass</button>
+                            ` : ''}
+                            ${acc.token ? `
+                            <button onclick="copyToClipboard('${acc.token}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition" title="Copy Token">Token</button>
+                            ` : ''}
+                            <button onclick="deleteAccount('${acc.id}')" class="p-1 text-slate-500 hover:text-rose-400 transition" title="Xóa">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            updateCountdowns();
+        }
+
+        // Update Live Countdowns
+        function updateCountdowns() {
+            const now = new Date();
+
+            filteredList.forEach(acc => {
+                const cdElem = document.getElementById(`countdown-${acc.id}`);
+                const badgeElem = document.getElementById(`status-badge-${acc.id}`);
+                if (!cdElem || !badgeElem) return;
+
+                const banEnd = new Date(acc.banEnd);
+                const diffMs = banEnd - now;
+
+                if (diffMs <= 0) {
+                    cdElem.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>Đã Mở Ban</span>`;
+                    badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[10px]">ĐÃ MỞ BAN</span>`;
+                } else {
+                    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    const timeStr = `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+
+                    if (diffMs <= 3600 * 1000) {
+                        // Under 1 hour
+                        cdElem.innerHTML = `<span class="text-amber-400 font-bold animate-pulse">${timeStr}</span>`;
+                        badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 font-medium text-[10px] pulse-badge">SẮP MỞ BAN</span>`;
+                    } else {
+                        cdElem.innerHTML = `<span class="text-rose-400">${timeStr}</span>`;
+                        badgeElem.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium text-[10px]">ĐANG BAN</span>`;
+                    }
+                }
+            });
+        }
+
+        // Check and Trigger Web Notification + Sound
+        function checkAndNotifyUnbanned() {
+            const now = new Date();
+
+            accountsList.forEach(acc => {
+                const banEnd = new Date(acc.banEnd);
+                if (now >= banEnd && !acc.notified) {
+                    // Trigger Sound
+                    if (soundEnabled) {
+                        const audio = document.getElementById('unbanSound');
+                        audio.play().catch(e => console.log('Audio autoplay prevented'));
+                    }
+
+                    // Trigger Web Push Notification
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification("🎉 Tài khoản đã MỞ BAN!", {
+                            body: `Tài khoản [${acc.email}] đã hết hạn ban. Nhấp vào đây để copy dữ liệu!`,
+                            icon: "https://cdn-icons-png.flaticon.com/512/190/190411.png"
+                        });
+                    }
+
+                    // Show Toast Notification
+                    showToast(`Tài khoản [${acc.email}] đã mở ban!`, "success");
+
+                    // Mark as notified in SQLite
+                    fetch(`/api/accounts/${acc.id}/notified`, { method: 'POST' });
+                }
+            });
+        }
+
+        // Copy Single Item
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Đã copy thành công!", "success");
+            }).catch(err => {
+                showToast("Không thể copy!", "error");
+            });
+        }
+
+        // Copy All Unbanned Raw Accounts
+        function copyUnbannedRawBatch() {
+            const now = new Date();
+            const unbannedRaws = accountsList
+                .filter(a => new Date(a.banEnd) <= now)
+                .map(a => a.rawData)
+                .join('\n');
+
+            if (!unbannedRaws) {
+                showToast("Chưa có tài khoản nào được mở ban!", "warning");
+                return;
+            }
+
+            copyToClipboard(unbannedRaws);
+            showToast(`Đã copy ${unbannedRaws.split('\n').length} tài khoản đã mở ban!`, "success");
+        }
+
+        // Select All Checkbox Toggle
+        function toggleSelectAll(master) {
+            const checkboxes = document.querySelectorAll('.acc-checkbox');
+            checkboxes.forEach(cb => cb.checked = master.checked);
+        }
+
+        // Batch Delete
+        async function deleteSelectedBatch() {
+            const selectedBoxes = document.querySelectorAll('.acc-checkbox:checked');
+            const ids = Array.from(selectedBoxes).map(cb => parseInt(cb.value));
+
+            if (ids.length === 0) {
+                showToast("Vui lòng chọn ít nhất 1 tài khoản để xóa!", "warning");
+                return;
+            }
+
+            if (confirm(`Bạn có chắc muốn xóa ${ids.length} tài khoản đã chọn?`)) {
+                try {
+                    const res = await fetch('/api/accounts/batch-delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`Đã xóa ${data.deletedCount} tài khoản!`, "success");
+                        fetchAccounts();
+                    }
+                } catch (err) {
+                    showToast("Xóa thất bại!", "error");
+                }
+            }
+        }
+
+        // Delete Single Account
+        async function deleteAccount(id) {
+            if (confirm("Xóa tài khoản này khỏi SQLite?")) {
+                await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+                showToast("Đã xóa tài khoản!", "success");
+                fetchAccounts();
+            }
+        }
+
+        // Export to CSV
+        function exportToCSV() {
+            if (accountsList.length === 0) {
+                showToast("Không có dữ liệu để xuất!", "warning");
+                return;
+            }
+
+            let csv = "ID,Email,Password,Token,UUID,BanStart,BanEnd,Status,RawData\n";
+            const now = new Date();
+
+            accountsList.forEach(a => {
+                const status = new Date(a.banEnd) <= now ? 'UNBANNED' : 'BANNED';
+                csv += `"${a.id}","${a.email}","${a.password}","${a.token}","${a.uuid}","${a.banStart}","${a.banEnd}","${status}","${a.rawData.replace(/"/g, '""')}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BanAccounts_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Toast Notification System
+        function showToast(message, type = "info") {
+            const toast = document.createElement('div');
+            let bgColor = "bg-slate-800 border-slate-700 text-white";
+            let icon = "fa-circle-info text-blue-400";
+
+            if (type === "success") {
+                bgColor = "bg-slate-900 border-emerald-500/40 text-emerald-200";
+                icon = "fa-circle-check text-emerald-400";
+            } else if (type === "error") {
+                bgColor = "bg-slate-900 border-rose-500/40 text-rose-200";
+                icon = "fa-triangle-exclamation text-rose-400";
+            } else if (type === "warning") {
+                bgColor = "bg-slate-900 border-amber-500/40 text-amber-200";
+                icon = "fa-circle-exclamation text-amber-400";
+            }
+
+            toast.className = `fixed bottom-5 right-5 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl border shadow-xl text-xs font-medium transition-all transform translate-y-2 opacity-0 ${bgColor}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${message}</span>`;
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
